@@ -10,5 +10,5 @@ The "qsub_slurm" bash script convert some of the qsub argument to be able to sub
 DTI-TK Home Page
 http://dti-tk.sourceforge.net
 
-# Author
+# Authors
 Hervé Lemaitre 2020/09/29
