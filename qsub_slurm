@@ -1,0 +1,121 @@
+#!/bin/sh
+
+# usage if no argument is given
+if [ -z "$1" ]; then
+cat <<EOU
+
+NAME
+          qsub_slurm - light convertor from qsub to sbatch
+
+VERSION
+          1.0 Herve Lemaitre 2020/09/25
+
+SYNTAX
+
+          qsub_slurm [ options] [ command ]
+
+DESCRIPTION
+          Convert qsub command to sbatch command.
+
+OPTIONS
+  -e        Defines or redefines the path  used  for  the  standard
+            error  stream of the job. 
+
+  -hold_jid wc_job_list
+
+            Defines or redefines the job  dependency  list  of  the
+            submitted  job.  A  reference by job name or pattern is
+            only accepted if the referenced job  is  owned  by  the
+            same  user  as  the referring job. The submitted job is
+            not eligible for execution unless all  jobs  referenced
+            in the comma-separated job id and/or job name list have
+            completed.  If any of the referenced  jobs  exits  with
+            exit code 100, the submitted job will remain ineligible
+            for execution.
+
+  -N        The name of the job.
+
+  -o        The path used for the standard  output  stream  of  the
+            of the job.
+
+  -sync y[es]|n[o]
+
+            -sync y causes qsub to wait for  the  job  to  complete
+            before  exiting. 
+
+  -V        Specifies that all environment variables active  within
+            the qsub utility be exported to the context of the job.
+
+EOU
+exit
+fi
+
+# Transform long options to short ones
+for arg in "$@"; do
+  shift
+  case "$arg" in
+    "-sync") set -- "$@" "-s" ;;
+    "-hold_jid") set -- "$@" "-h" ;;
+    "-cwd") set -- "$@" "-c" ;;
+    *)        set -- "$@" "$arg"
+  esac
+done
+
+# Short arguments
+while getopts 'o:e:N:s:h:b:Vc' OPTION
+do
+  case ${OPTION} in
+    o) OUT=${OPTARG} ;;
+    e) ERR=${OPTARG} ;;
+    N) NAME=${OPTARG} ;;
+    s) SYNC=${OPTARG} ;;
+    h) JOB=${OPTARG} ;;
+    b) BIN=${OPTARG} ;;
+    V) VAR=${OPTARG} ;;
+    c) CWD=${OPTARG} ;;
+  esac
+done
+
+shift $((OPTIND-1))
+
+ARGS="$@" 
+
+CMD=""
+
+# variables
+if [ -n "${VAR}" ] ; then
+CMD+=" --export=ALL"
+fi
+
+# out
+if [ -n "${OUT}" ] ; then
+CMD+=" -o ${OUT}"
+fi
+
+# error
+if [ -n "${ERR}" ] ; then
+CMD+=" -e ${ERR}"
+fi
+
+# job name
+if [ -n "${NAME}" ] ; then
+CMD+=" -J ${NAME}"
+fi
+ 
+# sync
+if [ "${SYNC}" = "y" ] ; then
+CMD+=" --wait"
+fi
+
+# hold_jid
+if [ -n "${JOB}" ] ; then
+JOBNAME="${JOB//"*"}"
+echo "jobname: $JOBNAME"
+sleep 5 # wait for jobname to be recorded
+JOBID=`sacct -n -X --format jobid,jobname%30 | grep ${JOBNAME} | tail -n 1 |  awk '{print $1}'`
+echo "jobid $JOBID"
+CMD+=" --dependency=afterok:${JOBID}"
+fi
+
+# submit job
+sbatch ${CMD} --wrap="${ARGS}"
